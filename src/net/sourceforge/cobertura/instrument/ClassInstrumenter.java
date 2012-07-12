@@ -23,6 +23,7 @@
 package net.sourceforge.cobertura.instrument;
 
 import java.util.Collection;
+import java.util.Set;
 
 import net.sourceforge.cobertura.coveragedata.ClassData;
 import net.sourceforge.cobertura.coveragedata.ProjectData;
@@ -44,6 +45,8 @@ class ClassInstrumenter extends ClassAdapter
 	private Collection ignoreRegexs;
 
 	private Collection ignoreBranchesRegexs;
+	
+	private Set<String> testAnnotations;
 
 	private ProjectData projectData;
 
@@ -64,12 +67,14 @@ class ClassInstrumenter extends ClassAdapter
 	}
 
 	public ClassInstrumenter(ProjectData projectData, final ClassVisitor cv,
-			final Collection ignoreRegexs, final Collection ignoreBranchesRegexes)
+			final Collection ignoreRegexs, final Collection ignoreBranchesRegexes,
+			final Set<String> testAnnotations)
 	{
 		super(cv);
 		this.projectData = projectData;
 		this.ignoreRegexs = ignoreRegexs;
 		this.ignoreBranchesRegexs = ignoreBranchesRegexs;
+		this.testAnnotations = testAnnotations;
 	}
 
 	private boolean arrayContains(Object[] array, Object key)
@@ -138,7 +143,7 @@ class ClassInstrumenter extends ClassAdapter
 
 		return mv == null ? null : new FirstPassMethodInstrumenter(classData, mv,
 				this.myName, access, name, desc, signature, exceptions, ignoreRegexs, 
-				ignoreBranchesRegexs);
+				ignoreBranchesRegexs, testAnnotations);
 	}
 
 	public void visitEnd()

@@ -53,7 +53,10 @@ public class SecondPassMethodInstrumenter extends NewLocalVariableMethodAdapter 
 	
 	private static final int BOOLEAN_TRUE = ICONST_0;
 	private static final int BOOLEAN_FALSE = ICONST_1;
-
+	
+	// Used for the wrapping of the method in try finally
+	private Label startFinally = new Label(); 
+	
 	public SecondPassMethodInstrumenter(FirstPassMethodInstrumenter firstPass)
 	{
 		super(firstPass.getWriterMethodVisitor(), firstPass.getMyAccess(), firstPass.getMyDescriptor(), 2);
@@ -138,7 +141,15 @@ public class SecondPassMethodInstrumenter extends NewLocalVariableMethodAdapter 
 	{
 		//to touch the previous branch (when there is such)
 		touchBranchFalse();
-		
+		switch (opcode) {
+		case IRETURN :
+		case LRETURN :
+		case FRETURN : 
+		case DRETURN :
+		case ARETURN :
+		case RETURN :
+			onFinally(opcode);		
+		}
 		super.visitInsn(opcode);
 	}
 
@@ -280,9 +291,21 @@ public class SecondPassMethodInstrumenter extends NewLocalVariableMethodAdapter 
 	public void visitCode()
 	{
 		methodStarted = true;
+		mv.visitLabel(startFinally); 
+		if (firstPass.isInTestMethod()) {
+			instrumentStartRecording();
+		}
 		super.visitCode();
 	}
 	
+	@Override
+	public void visitEnd() {
+		/*if (firstPass.isInTestMethod())
+			instrumentStopRecording();*/
+		super.visitEnd();
+		
+	}
+
 	private void touchBranchFalse() {
 		if (lastJump != null) {
 			lastJump = null;
@@ -290,6 +313,14 @@ public class SecondPassMethodInstrumenter extends NewLocalVariableMethodAdapter 
 		}
 	}
 
+	private void instrumentStartRecording() {
+		mv.visitMethodInsn(INVOKESTATIC, TOUCH_COLLECTOR_CLASS, "startRecording", "()V");
+	}
+	
+	private void instrumentStopRecording() {
+		mv.visitMethodInsn(INVOKESTATIC, TOUCH_COLLECTOR_CLASS, "stopRecording", "()V");
+	}
+	
 	private void instrumentOwnerClass()
 	{
 		// OwnerClass is the name of the class being instrumented
@@ -319,7 +350,7 @@ public class SecondPassMethodInstrumenter extends NewLocalVariableMethodAdapter 
 
 	private void instrumentInvokeTouchJump()
 	{
-		mv.visitMethodInsn(INVOKESTATIC, TOUCH_COLLECTOR_CLASS, "touchJump", "(Ljava/lang/String;IIZ)V");
+		mv.visitMethodInsn(INVOKESTATIC, TOUCH_COLLECTOR_CLASS, "touchJump", "()V");
 		mv.visitIntInsn(SIPUSH, -1); //is important to reset current branch, because we have to know that the branch info on stack has already been used and can't be used
 		mv.visitVarInsn(ISTORE, myVariableIndex + 1);
 	}
@@ -348,9 +379,22 @@ public class SecondPassMethodInstrumenter extends NewLocalVariableMethodAdapter 
 
 	public void visitMaxs(int maxStack, int maxLocals)
 	{
+		Label endFinally = new Label(); 
+		mv.visitTryCatchBlock(startFinally, 
+				endFinally, endFinally, null); 
+		mv.visitLabel(endFinally); 
+		onFinally(ATHROW); 
+		mv.visitInsn(ATHROW); 
+
 		mv.visitLocalVariable("__cobertura__line__number__", "I", null, startLabel, endLabel, myVariableIndex);
 		mv.visitLocalVariable("__cobertura__branch__number__", "I", null, startLabel, endLabel, myVariableIndex + 1);
+		
 		super.visitMaxs(maxStack, maxLocals);
+	}
+
+	private void onFinally(int opcode) {
+		if (firstPass.isInTestMethod())
+			instrumentStopRecording();
 	}
 
 }

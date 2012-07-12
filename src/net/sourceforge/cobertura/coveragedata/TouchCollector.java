@@ -43,6 +43,9 @@ public class TouchCollector implements HasBeenInstrumented{
 	private static final Map<String,Integer> class2classId=new ConcurrentHashMap<String, Integer>();
 	private static final Map<Integer,String> classId2class=new ConcurrentHashMap<Integer,String>();
 
+	private static boolean record = true;
+	private static boolean hasCleaned = false;
+	
 	static{
 		ProjectData.initialize();
 	}
@@ -57,13 +60,20 @@ public class TouchCollector implements HasBeenInstrumented{
 		}
 		return res;
 	}
-	
+
+	private static void cleanup() {
+		touchedLines.getFinalStateAndCleanIt();
+		switchTouchData.getFinalStateAndCleanIt();
+		jumpTouchData.getFinalStateAndCleanIt();
+	}
+
 	/**
 	 * This method is only called by code that has been instrumented.  It
 	 * is not called by any of the Cobertura code or ant tasks.
 	 */
 	public static final void touchSwitch(String classId,int lineNumber, int switchNumber, int branch) {
-		switchTouchData.incrementValue(new SwitchTouchData(registerClassData(classId),lineNumber, switchNumber, branch));
+		if (record)
+			switchTouchData.incrementValue(new SwitchTouchData(registerClassData(classId),lineNumber, switchNumber, branch));
 	}
 	
 	/**
@@ -71,7 +81,8 @@ public class TouchCollector implements HasBeenInstrumented{
 	 * is not called by any of the Cobertura code or ant tasks.
 	 */
 	public static final void touch(String classId,int lineNumber) {
-		touchedLines.incrementValue(new LineTouchData(registerClassData(classId), lineNumber));
+		if (record)
+			touchedLines.incrementValue(new LineTouchData(registerClassData(classId), lineNumber));
 	}
 	
 	/**
@@ -79,9 +90,22 @@ public class TouchCollector implements HasBeenInstrumented{
 	 * is not called by any of the Cobertura code or ant tasks.
 	 */
 	public static final void touchJump(String classId,int lineNumber, int branchNumber, boolean branch) {
-		jumpTouchData.incrementValue(new JumpTouchData(registerClassData(classId),lineNumber, branchNumber, branch));
+		if (record)
+			jumpTouchData.incrementValue(new JumpTouchData(registerClassData(classId),lineNumber, branchNumber, branch));
 	}	
 
+	public static final void startRecording() {
+		if (!hasCleaned) {
+			cleanup();
+			hasCleaned = true;
+		}
+		record = true;
+	} 
+	
+	public static final void stopRecording() {
+		record = false;
+	}
+	
 	private static class LineTouchData implements HasBeenInstrumented{
 		int classId,lineNumber;
 		public LineTouchData(int classId,int lineNumber) {

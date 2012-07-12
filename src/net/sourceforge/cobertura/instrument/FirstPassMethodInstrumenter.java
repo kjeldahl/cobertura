@@ -25,10 +25,12 @@ package net.sourceforge.cobertura.instrument;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import net.sourceforge.cobertura.coveragedata.ClassData;
 import net.sourceforge.cobertura.util.RegexUtil;
 
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodAdapter;
 import org.objectweb.asm.MethodVisitor;
@@ -49,6 +51,8 @@ public class FirstPassMethodInstrumenter extends MethodAdapter implements Opcode
 	private Collection ignoreRegexs;
    
 	private Collection ignoreBranchesRegexs;
+	
+	private Set<String> testAnnotations;
 
 	private ClassData classData;
 
@@ -68,10 +72,12 @@ public class FirstPassMethodInstrumenter extends MethodAdapter implements Opcode
    
 	private MethodNode methodNode;
 
+	private boolean inTestMethod;
+
 	public FirstPassMethodInstrumenter(ClassData classData, final MethodVisitor mv,
 			final String owner, final int access, final String name, final String desc, 
 			final String signature, final String[] exceptions, final Collection ignoreRegexs,
-			final Collection ignoreBranchesRegexs)
+			final Collection ignoreBranchesRegexs, final Set<String> testAnnotations)
 	{
 		super(new MethodNode(access, name, desc, signature, exceptions));
 		writerMethodVisitor = mv;
@@ -83,6 +89,7 @@ public class FirstPassMethodInstrumenter extends MethodAdapter implements Opcode
 		this.myDescriptor = desc;
 		this.ignoreRegexs = ignoreRegexs;
 		this.ignoreBranchesRegexs = ignoreBranchesRegexs;
+		this.testAnnotations = testAnnotations;
 		this.jumpTargetLabels = new HashMap();
 		this.switchTargetLabels = new HashMap();
 		this.lineLabels = new HashMap();
@@ -93,6 +100,14 @@ public class FirstPassMethodInstrumenter extends MethodAdapter implements Opcode
 		super.visitEnd();
 
 		methodNode.accept(lineLabels.isEmpty() ? writerMethodVisitor : new SecondPassMethodInstrumenter(this)); //when there is no line number info -> no instrumentation
+	}
+
+	@Override
+	public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+		if (testAnnotations.contains(desc)) {
+			inTestMethod = true;
+		}
+		return super.visitAnnotation(desc, visible);
 	}
 
 	public void visitJumpInsn(int opcode, Label label)
@@ -201,6 +216,10 @@ public class FirstPassMethodInstrumenter extends MethodAdapter implements Opcode
 	protected String getMyDescriptor() 
 	{
 		return myDescriptor;
+	}
+
+	public boolean isInTestMethod() {
+		return inTestMethod;
 	}
 
 	protected String getMyName() 

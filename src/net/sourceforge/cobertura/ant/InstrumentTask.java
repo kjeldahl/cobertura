@@ -89,6 +89,8 @@ public class InstrumentTask extends CommonMatchingTask
 
 	List excludeClassesRegexs = new ArrayList();
 
+	List<TestAnnotation> testAnnotations = new ArrayList<TestAnnotation>();
+
 	private Integer forkedJVMDebugPort;
 	
 	private Path instrumentationClasspath = null;
@@ -105,6 +107,13 @@ public class InstrumentTask extends CommonMatchingTask
 		Ignore ignoreRegex = new Ignore();
 		ignoreRegexs.add(ignoreRegex);
 		return ignoreRegex;
+	}
+	
+	public TestAnnotation createTestAnnotation()
+	{
+		TestAnnotation testAnnotation = new TestAnnotation();
+		testAnnotations.add(testAnnotation);
+		return testAnnotation;
 	}
 
 	public IgnoreBranches createIgnoreBranches()
@@ -177,6 +186,11 @@ public class InstrumentTask extends CommonMatchingTask
 				builder.addArg("--excludeClasses", excludeClassesRegex.getRegex());
 			}
 
+			for (int i = 0; i < testAnnotations.size(); i++) {
+				TestAnnotation testAnnotation = (TestAnnotation)testAnnotations.get(i);
+				builder.addArg("--testAnnotation", testAnnotation.getAnnotation());
+			}
+			
 			if (instrumentationClasspath != null) {
 				processInstrumentationClasspath();
 			}

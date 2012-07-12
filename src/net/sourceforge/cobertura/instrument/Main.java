@@ -37,8 +37,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.Vector;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -95,6 +97,8 @@ public class Main
 
 	private Collection ignoreBranchesRegexes = new Vector();
 
+	private Set<String> testAnnotations = new HashSet<String>();
+	
 	private ClassPattern classPattern = new ClassPattern();
 
 	private ProjectData projectData = null;
@@ -184,7 +188,7 @@ public class Main
 						ClassReader cr = new ClassReader(entryBytes);
 						ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 						ClassInstrumenter cv = new ClassInstrumenter(projectData,
-								cw, ignoreRegexes, ignoreBranchesRegexes);
+								cw, ignoreRegexes, ignoreBranchesRegexes, testAnnotations);
 						cr.accept(cv, 0);
 	
 						// If class was instrumented, get bytes that define the
@@ -354,7 +358,7 @@ public class Main
 			inputStream = new FileInputStream(file);
 			ClassReader cr = new ClassReader(inputStream);
 			cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-			cv = new ClassInstrumenter(projectData, cw, ignoreRegexes, ignoreBranchesRegexes);
+			cv = new ClassInstrumenter(projectData, cw, ignoreRegexes, ignoreBranchesRegexes, testAnnotations);
 			cr.accept(cv, 0);
 		}
 		catch (Throwable t)
@@ -460,6 +464,11 @@ public class Main
 			{
 				classPattern.addExcludeClassesRegex(args[++i]);
 			}
+			else if (args[i].equals("--testAnnotation"))
+			{
+				String testAnnotation = args[++i];
+				testAnnotations.add(normalizeAnnotation(testAnnotation));
+			}
 			else
 			{
 				CoberturaFile coberturaFile = new CoberturaFile(baseDir, args[i]);
@@ -495,6 +504,18 @@ public class Main
 
 		// Save coverage data
 		CoverageDataFileHandler.saveCoverageData(projectData, dataFile);
+	}
+
+	/**
+	 * Expect stuff like org.junit.Test as input and output Lorg/junit/Test;
+	 * @param testAnnotation
+	 * @return
+	 */
+	private String normalizeAnnotation(String testAnnotation) {
+		if (testAnnotation == null)
+			return null;
+		
+		return "L"+testAnnotation.replace('.', '/')+";";
 	}
 
 	public static void main(String[] args)
